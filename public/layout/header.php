@@ -18,6 +18,21 @@
         main {
             flex: 1;
         }
+        .card-hover {
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        cursor: pointer;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .card-hover a {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
     </style>
 </head>
 <body>
