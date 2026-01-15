@@ -1,16 +1,23 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 
-// ERROS (desenvolvimento)
+// DEVOLVER LIVRO
+if (isset($_POST['devolver_id'])) {
+    $id = $_POST['devolver_id'];
+
+    $sql = "UPDATE emprestimos SET devolvido = 1 WHERE id = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$id]);
+
+    header("Location: emprestimos.php");
+    exit;
+}
+
+
+// MOSTRAR ERROS (desenvolvimento)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-
-// BUSCAR LIVROS
-$livros = $pdo->query("SELECT id, titulo FROM livros ORDER BY titulo")->fetchAll();
-
-// BUSCAR LEITORES
-$leitores = $pdo->query("SELECT id, nome FROM leitores ORDER BY nome")->fetchAll();
 
 // REGISTRAR EMPRÉSTIMO
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -36,21 +43,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// BUSCAR LIVROS
+$livros = $pdo->query("SELECT id, titulo FROM livros ORDER BY titulo")
+              ->fetchAll(PDO::FETCH_ASSOC);
+
+// BUSCAR LEITORES
+$leitores = $pdo->query("SELECT id, nome FROM leitores ORDER BY nome")
+                ->fetchAll(PDO::FETCH_ASSOC);
+
 // LISTAR EMPRÉSTIMOS
 $sql = "
-    SELECT 
-        e.id,
-        l.titulo AS livro,
-        r.nome AS leitor,
-        e.data_emprestimo,
-        e.data_devolucao,
-        e.devolvido
-    FROM emprestimos e
-    JOIN livros l ON l.id = e.livro_id
-    JOIN leitores r ON r.id = e.leitor_id
-    ORDER BY e.id DESC
+SELECT 
+    e.id,
+    l.titulo AS livro,
+    r.nome AS leitor,
+    e.data_emprestimo,
+    e.data_devolucao,
+    e.devolvido
+FROM emprestimos e
+JOIN livros l ON l.id = e.livro_id
+JOIN leitores r ON r.id = e.leitor_id
+ORDER BY e.id DESC
 ";
-$emprestimos = $pdo->query($sql)->fetchAll();
+
+$emprestimos = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
 include __DIR__ . '/layout/header.php';
 ?>
@@ -106,7 +122,6 @@ include __DIR__ . '/layout/header.php';
                     <button class="btn btn-dark w-100">
                         Registrar Empréstimo
                     </button>
-
                 </form>
 
             </div>
@@ -129,6 +144,8 @@ include __DIR__ . '/layout/header.php';
                             <th>Empréstimo</th>
                             <th>Devolução</th>
                             <th>Status</th>
+                            <th>Ações</th>
+
                         </tr>
                     </thead>
                     <tbody>
@@ -146,16 +163,28 @@ include __DIR__ . '/layout/header.php';
                                     <td>
                                         <?= $e['data_devolucao']
                                             ? date('d/m/Y', strtotime($e['data_devolucao']))
-                                            : '—'
-                                        ?>
+                                            : '-' ?>
                                     </td>
-                                    <td>
-                                        <?php if ($e['devolvido']): ?>
-                                            <span class="badge bg-success">Devolvido</span>
-                                        <?php else: ?>
-                                            <span class="badge bg-warning text-dark">Em aberto</span>
-                                        <?php endif; ?>
-                                    </td>
+                                        <td>
+                                            <?php if ($e['devolvido']): ?>
+                                                <span class="badge bg-success">Devolvido</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-warning text-dark">Em aberto</span>
+                                            <?php endif; ?>
+                                        </td>
+
+                                        <td>
+                                            <?php if (!$e['devolvido']): ?>
+                                                <form method="POST" style="display:inline;">
+                                                    <input type="hidden" name="devolver_id" value="<?= $e['id'] ?>">
+                                                    <button class="btn btn-sm btn-success">
+                                                        Devolver
+                                                    </button>
+                                                </form>
+                                            <?php else: ?>
+                                                —
+                                            <?php endif; ?>
+                                        </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
