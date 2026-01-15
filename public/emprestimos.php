@@ -1,37 +1,41 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 
-// MOSTRAR ERROS
+// MOSTRAR ERROS (desenvolvimento)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
 $erro = null;
 $sucesso = null;
-
 
 // ==============================
 // DEVOLVER LIVRO
 // ==============================
 if (isset($_POST['devolver_id'])) {
-    $id = $_POST['devolver_id'];
+    $id = (int) $_POST['devolver_id'];
 
     $stmt = $pdo->prepare("SELECT livro_id FROM emprestimos WHERE id = ?");
     $stmt->execute([$id]);
     $emprestimo = $stmt->fetch();
 
     if ($emprestimo) {
-        $pdo->prepare("UPDATE emprestimos SET devolvido = 1 WHERE id = ?")->execute([$id]);
-        $pdo->prepare("UPDATE livros SET quantidade = quantidade + 1 WHERE id = ?")->execute([$emprestimo['livro_id']]);
-    }
+        $pdo->prepare("UPDATE emprestimos SET devolvido = 1 WHERE id = ?")
+            ->execute([$id]);
 
-    header("Location: emprestimos.php");
-    exit;
+        $pdo->prepare("UPDATE livros SET quantidade = quantidade + 1 WHERE id = ?")
+            ->execute([$emprestimo['livro_id']]);
+
+        header("Location: emprestimos.php?sucesso=devolvido");
+        exit;
+    }
 }
 
 // ==============================
 // REGISTRAR OU EDITAR EMPRÉSTIMO
 // ==============================
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['devolver_id'])) {
+
     $editar_id = $_POST['editar_id'] ?? null;
     $livro_id = $_POST['livro_id'] ?? null;
     $leitor_id = $_POST['leitor_id'] ?? null;
@@ -39,37 +43,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data_devolucao = $_POST['data_devolucao'] ?? null;
 
     if ($livro_id && $leitor_id && $data_emprestimo) {
+
         if ($editar_id) {
-            // ==========================
+            // ======================
             // EDIÇÃO
-            // ==========================
-            // Buscar empréstimo antigo
+            // ======================
             $stmt = $pdo->prepare("SELECT livro_id FROM emprestimos WHERE id = ?");
             $stmt->execute([$editar_id]);
             $antigo = $stmt->fetch();
 
-            if ($antigo) {
-                $livro_antigo = $antigo['livro_id'];
+            if ($antigo && $antigo['livro_id'] != $livro_id) {
 
-                // Se o livro mudou, ajustar estoque
-                if ($livro_antigo != $livro_id) {
-                    // Verificar estoque do novo livro
-                    $check = $pdo->prepare("SELECT quantidade FROM livros WHERE id = ?");
-                    $check->execute([$livro_id]);
-                    $novo_livro = $check->fetch();
-                    if (!$novo_livro || $novo_livro['quantidade'] <= 0) {
-                        $erro = "❌ O livro selecionado não possui estoque disponível.";
-                    }
+                // Verificar estoque do novo livro
+                $check = $pdo->prepare("SELECT quantidade FROM livros WHERE id = ?");
+                $check->execute([$livro_id]);
+                $novo = $check->fetch();
 
-                    // Aumentar estoque do livro antigo
+                if (!$novo || $novo['quantidade'] <= 0) {
+                    $erro = "❌ O livro selecionado não possui estoque disponível.";
+                } else {
+                    // Ajustar estoques
                     $pdo->prepare("UPDATE livros SET quantidade = quantidade + 1 WHERE id = ?")
-                        ->execute([$livro_antigo]);
-                    // Diminuir estoque do livro novo
-                    $pdo->prepare("UPDATE livros SET quantidade = quantidade - 1 WHERE id = ? AND quantidade > 0")
+                        ->execute([$antigo['livro_id']]);
+
+                    $pdo->prepare("UPDATE livros SET quantidade = quantidade - 1 WHERE id = ?")
                         ->execute([$livro_id]);
                 }
+            }
 
-                // Atualizar empréstimo
+            if (!$erro) {
                 $pdo->prepare("
                     UPDATE emprestimos SET
                         livro_id = ?,
@@ -77,37 +79,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         data_emprestimo = ?,
                         data_devolucao = ?
                     WHERE id = ?
-                ")->execute([$livro_id, $leitor_id, $data_emprestimo, $data_devolucao, $editar_id]);
+                ")->execute([
+                    $livro_id,
+                    $leitor_id,
+                    $data_emprestimo,
+                    $data_devolucao,
+                    $editar_id
+                ]);
 
-                header("Location: emprestimos.php");
+                header("Location: emprestimos.php?sucesso=editado");
                 exit;
             }
+
         } else {
-            // ==========================
+            // ======================
             // NOVO EMPRÉSTIMO
-            // ==========================
-            // Verificar estoque
+            // ======================
             $check = $pdo->prepare("SELECT quantidade FROM livros WHERE id = ?");
             $check->execute([$livro_id]);
             $livro = $check->fetch();
+
             if (!$livro || $livro['quantidade'] <= 0) {
-                $erro = "❌ Livro sem estoque disponível para empréstimo.";
-            }
-
-            if (!$erro) {
-                // Inserir empréstimo
+                $erro = "❌ Livro sem estoque disponível.";
+            } else {
                 $pdo->prepare("
-                    INSERT INTO emprestimos (livro_id, leitor_id, data_emprestimo, data_devolucao, devolvido)
+                    INSERT INTO emprestimos 
+                    (livro_id, leitor_id, data_emprestimo, data_devolucao, devolvido)
                     VALUES (?, ?, ?, ?, 0)
-                ")->execute([$livro_id, $leitor_id, $data_emprestimo, $data_devolucao]);
+                ")->execute([
+                    $livro_id,
+                    $leitor_id,
+                    $data_emprestimo,
+                    $data_devolucao
+                ]);
 
-                // Diminuir estoque
-                $pdo->prepare("UPDATE livros SET quantidade = quantidade - 1 WHERE id = ? AND quantidade > 0")
+                $pdo->prepare("UPDATE livros SET quantidade = quantidade - 1 WHERE id = ?")
                     ->execute([$livro_id]);
 
-                $sucesso = "📚 Empréstimo registrado com sucesso!";
+                header("Location: emprestimos.php?sucesso=registrado");
+                exit;
             }
-
         }
     }
 }
@@ -123,61 +134,70 @@ if (isset($_GET['edit'])) {
 }
 
 // ==============================
-// BUSCAR LIVROS E LEITORES
+// LIVROS E LEITORES
 // ==============================
 $livros = $pdo->query("
     SELECT id, titulo, quantidade 
     FROM livros 
     ORDER BY titulo
 ")->fetchAll(PDO::FETCH_ASSOC);
-$leitores = $pdo->query("SELECT id, nome FROM leitores ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+
+$leitores = $pdo->query("
+    SELECT id, nome 
+    FROM leitores 
+    ORDER BY nome
+")->fetchAll(PDO::FETCH_ASSOC);
 
 // ==============================
 // LISTAR EMPRÉSTIMOS
 // ==============================
-$sql = "
-SELECT 
-    e.id,
-    l.titulo AS livro,
-    r.nome AS leitor,
-    e.data_emprestimo,
-    e.data_devolucao,
-    e.devolvido
-FROM emprestimos e
-JOIN livros l ON l.id = e.livro_id
-JOIN leitores r ON r.id = e.leitor_id
-ORDER BY e.id DESC
-";
-$emprestimos = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+$emprestimos = $pdo->query("
+    SELECT 
+        e.id,
+        l.titulo AS livro,
+        r.nome AS leitor,
+        e.data_emprestimo,
+        e.data_devolucao,
+        e.devolvido
+    FROM emprestimos e
+    JOIN livros l ON l.id = e.livro_id
+    JOIN leitores r ON r.id = e.leitor_id
+    ORDER BY e.id DESC
+")->fetchAll(PDO::FETCH_ASSOC);
 
 include __DIR__ . '/layout/header.php';
 ?>
 
-<h2>🔄 Empréstimos</h2>
+<h2 class="mb-4">🔄 Gestão de Empréstimos</h2>
+
+<?php if (isset($_GET['sucesso'])): ?>
+    <div class="alert alert-success shadow-sm">
+        <?php
+            if ($_GET['sucesso'] === 'registrado') echo "📚 Empréstimo registrado com sucesso.";
+            if ($_GET['sucesso'] === 'editado') echo "✏️ Empréstimo atualizado com sucesso.";
+            if ($_GET['sucesso'] === 'devolvido') echo "✅ Livro devolvido com sucesso.";
+        ?>
+    </div>
+<?php endif; ?>
 
 <?php if ($erro): ?>
-    <div class="alert alert-danger">
+    <div class="alert alert-danger shadow-sm">
         <?= $erro ?>
     </div>
 <?php endif; ?>
 
-<?php if ($sucesso): ?>
-    <div class="alert alert-success">
-        <?= $sucesso ?>
-    </div>
-<?php endif; ?>
-
-
-<div class="row mt-4">
+<div class="row g-4">
 
     <!-- FORMULÁRIO -->
     <div class="col-md-4">
-        <div class="card">
-            <div class="card-header bg-warning">
-                <?= $editar_emprestimo ? "Editar Empréstimo" : "Registrar Empréstimo" ?>
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning fw-semibold">
+                <?= $editar_emprestimo ? "✏️ Editar Empréstimo" : "➕ Registrar Empréstimo" ?>
             </div>
+
             <div class="card-body">
                 <form method="POST">
+
                     <?php if ($editar_emprestimo): ?>
                         <input type="hidden" name="editar_id" value="<?= $editar_emprestimo['id'] ?>">
                     <?php endif; ?>
@@ -189,13 +209,11 @@ include __DIR__ . '/layout/header.php';
                             <?php foreach ($livros as $livro): ?>
                                 <option value="<?= $livro['id'] ?>"
                                     <?= $livro['quantidade'] <= 0 ? 'disabled' : '' ?>
-                                    <?= ($editar_emprestimo && $editar_emprestimo['livro_id'] == $livro['id']) ? 'selected' : '' ?>
-                                >
+                                    <?= ($editar_emprestimo && $editar_emprestimo['livro_id'] == $livro['id']) ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($livro['titulo']) ?>
                                     <?= $livro['quantidade'] <= 0 ? ' (Sem estoque)' : '' ?>
                                 </option>
                             <?php endforeach; ?>
-
                         </select>
                     </div>
 
@@ -205,7 +223,7 @@ include __DIR__ . '/layout/header.php';
                             <option value="">Selecione</option>
                             <?php foreach ($leitores as $leitor): ?>
                                 <option value="<?= $leitor['id'] ?>"
-                                    <?= ($editar_emprestimo && $editar_emprestimo['leitor_id']==$leitor['id']) ? 'selected' : '' ?>>
+                                    <?= ($editar_emprestimo && $editar_emprestimo['leitor_id'] == $leitor['id']) ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($leitor['nome']) ?>
                                 </option>
                             <?php endforeach; ?>
@@ -224,12 +242,16 @@ include __DIR__ . '/layout/header.php';
                                value="<?= $editar_emprestimo['data_devolucao'] ?? '' ?>">
                     </div>
 
-                    <button class="btn btn-dark w-100">
-                        <?= $editar_emprestimo ? "Salvar Alterações" : "Registrar Empréstimo" ?>
+                    <button class="btn btn-dark w-100 shadow-sm">
+                        💾 <?= $editar_emprestimo ? "Salvar Alterações" : "Registrar Empréstimo" ?>
                     </button>
+
                     <?php if ($editar_emprestimo): ?>
-                        <a href="emprestimos.php" class="btn btn-secondary w-100 mt-2">Cancelar</a>
+                        <a href="emprestimos.php" class="btn btn-outline-secondary w-100 mt-2">
+                            Cancelar
+                        </a>
                     <?php endif; ?>
+
                 </form>
             </div>
         </div>
@@ -237,25 +259,30 @@ include __DIR__ . '/layout/header.php';
 
     <!-- LISTAGEM -->
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-dark text-white">
-                Empréstimos
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white fw-semibold">
+                📋 Empréstimos Registrados
             </div>
-            <div class="card-body">
-                <table class="table table-striped">
-                    <thead>
+
+            <div class="card-body p-0">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead class="table-light">
                         <tr>
                             <th>Livro</th>
                             <th>Leitor</th>
                             <th>Empréstimo</th>
                             <th>Devolução</th>
                             <th>Status</th>
-                            <th>Ações</th>
+                            <th class="text-center">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (count($emprestimos) === 0): ?>
-                            <tr><td colspan="6">Nenhum empréstimo registrado</td></tr>
+                        <?php if (!$emprestimos): ?>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    Nenhum empréstimo registrado
+                                </td>
+                            </tr>
                         <?php else: ?>
                             <?php foreach ($emprestimos as $e): ?>
                                 <tr>
@@ -270,15 +297,17 @@ include __DIR__ . '/layout/header.php';
                                             <span class="badge bg-warning text-dark">Em aberto</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td class="text-center">
                                         <?php if (!$e['devolvido']): ?>
-                                            <form method="POST" style="display:inline;">
+                                            <form method="POST" class="d-inline">
                                                 <input type="hidden" name="devolver_id" value="<?= $e['id'] ?>">
                                                 <button class="btn btn-sm btn-success">Devolver</button>
                                             </form>
-                                            <a href="?edit=<?= $e['id'] ?>" class="btn btn-sm btn-warning">Editar</a>
+                                            <a href="?edit=<?= $e['id'] ?>" class="btn btn-sm btn-warning">
+                                                Editar
+                                            </a>
                                         <?php else: ?>
-                                            — 
+                                            —
                                         <?php endif; ?>
                                     </td>
                                 </tr>

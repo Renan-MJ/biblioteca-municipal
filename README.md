@@ -106,3 +106,29 @@ Login não implementado (acesso aberto)
 Layout com Bootstrap, facilmente ajustável
 
 Todos os dados podem ser conferidos via HeidiSQL
+
+15/01/2026 16:59
+
+Sistema Biblioteca Municipal
+
+PHP + PDO
+
+MySQL
+
+CRUD de Leitores
+
+CRUD de Livros
+
+Controle de Empréstimos
+
+Relacionamentos com Foreign Key
+
+Validação de exclusão (leitor com empréstimo ativo)
+
+Exclusão segura de registros dependentes
+
+Bootstrap 5 (layout responsivo)
+
+Estrutura com header/footer
+
+Regras de negócio aplicadas no backend

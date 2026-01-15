@@ -39,19 +39,27 @@
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary py-3 shadow-sm">
     <div class="container-fluid">
-        <a class="navbar-brand" href="index.php">📚 Biblioteca</a>
+
+        <a class="navbar-brand fw-bold fs-4" href="index.php">
+            Biblioteca Municipal
+        </a>
 
         <div class="collapse navbar-collapse">
-            <ul class="navbar-nav">
-                <li class="nav-item"><a class="nav-link" href="livros.php">Livros</a></li>
-                <li class="nav-item"><a class="nav-link" href="leitores.php">Leitores</a></li>
-                <li class="nav-item"><a class="nav-link" href="emprestimos.php">Empréstimos</a></li>
+            <ul class="navbar-nav ms-4">
+                <li class="nav-item">
+                    <a class="nav-link fw-semibold" href="livros.php">Livros</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link fw-semibold" href="leitores.php">Leitores</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link fw-semibold" href="emprestimos.php">Empréstimos</a>
+                </li>
             </ul>
         </div>
+
     </div>
 </nav>
 
-<main>
-    <div class="container mt-4">
