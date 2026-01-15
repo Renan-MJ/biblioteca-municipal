@@ -125,7 +125,11 @@ if (isset($_GET['edit'])) {
 // ==============================
 // BUSCAR LIVROS E LEITORES
 // ==============================
-$livros = $pdo->query("SELECT id, titulo FROM livros ORDER BY titulo")->fetchAll(PDO::FETCH_ASSOC);
+$livros = $pdo->query("
+    SELECT id, titulo, quantidade 
+    FROM livros 
+    ORDER BY titulo
+")->fetchAll(PDO::FETCH_ASSOC);
 $leitores = $pdo->query("SELECT id, nome FROM leitores ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
 
 // ==============================
@@ -184,10 +188,14 @@ include __DIR__ . '/layout/header.php';
                             <option value="">Selecione</option>
                             <?php foreach ($livros as $livro): ?>
                                 <option value="<?= $livro['id'] ?>"
-                                    <?= ($editar_emprestimo && $editar_emprestimo['livro_id']==$livro['id']) ? 'selected' : '' ?>>
+                                    <?= $livro['quantidade'] <= 0 ? 'disabled' : '' ?>
+                                    <?= ($editar_emprestimo && $editar_emprestimo['livro_id'] == $livro['id']) ? 'selected' : '' ?>
+                                >
                                     <?= htmlspecialchars($livro['titulo']) ?>
+                                    <?= $livro['quantidade'] <= 0 ? ' (Sem estoque)' : '' ?>
                                 </option>
                             <?php endforeach; ?>
+
                         </select>
                     </div>
 
