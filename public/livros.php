@@ -6,19 +6,25 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// CADASTRAR LIVRO
+// CADASTRAR OU EDITAR LIVRO
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     $titulo = $_POST['titulo'] ?? '';
     $autor = $_POST['autor'] ?? '';
-    $editora = $_POST['editora'] ?? '';
     $ano = !empty($_POST['ano']) ? $_POST['ano'] : null;
-    $quantidade = 1;
 
-    if ($titulo && $autor) {
-        $sql = "INSERT INTO livros (titulo, autor, editora, ano, quantidade)
-                VALUES (?, ?, ?, ?, ?)";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$titulo, $autor, $editora, $ano, $quantidade]);
+    // Se existe id, é edição
+    if (!empty($_POST['id'])) {
+        $id = $_POST['id'];
+        $stmt = $pdo->prepare("UPDATE livros SET titulo=?, autor=?, ano=? WHERE id=?");
+        $stmt->execute([$titulo, $autor, $ano, $id]);
+    } else {
+        // Cadastro novo
+        $quantidade = 1;
+        if ($titulo && $autor) {
+            $stmt = $pdo->prepare("INSERT INTO livros (titulo, autor, ano, quantidade) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$titulo, $autor, $ano, $quantidade]);
+        }
     }
 
     header("Location: livros.php");
@@ -29,9 +35,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $stmt = $pdo->query("SELECT * FROM livros ORDER BY id DESC");
 $livros = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// EDITAR LIVRO (preencher formulário)
+$edit_livro = null;
+if (isset($_GET['edit'])) {
+    $id = $_GET['edit'];
+    $stmt = $pdo->prepare("SELECT * FROM livros WHERE id=?");
+    $stmt->execute([$id]);
+    $edit_livro = $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
 include __DIR__ . '/layout/header.php';
 ?>
-
 
 <h2>📚 Livros</h2>
 
@@ -41,34 +55,39 @@ include __DIR__ . '/layout/header.php';
     <div class="col-md-4">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                Cadastrar Livro
+                <?= $edit_livro ? "Editar Livro" : "Cadastrar Livro" ?>
             </div>
             <div class="card-body">
 
                 <form method="POST">
+                    <?php if ($edit_livro): ?>
+                        <input type="hidden" name="id" value="<?= $edit_livro['id'] ?>">
+                    <?php endif; ?>
+
                     <div class="mb-3">
                         <label class="form-label">Título</label>
-                        <input type="text" name="titulo" class="form-control" required>
+                        <input type="text" name="titulo" class="form-control" required
+                               value="<?= $edit_livro['titulo'] ?? '' ?>">
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Autor</label>
-                        <input type="text" name="autor" class="form-control" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Editora</label>
-                        <input type="text" name="editora" class="form-control">
+                        <input type="text" name="autor" class="form-control" required
+                               value="<?= $edit_livro['autor'] ?? '' ?>">
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Ano</label>
-                        <input type="number" name="ano" class="form-control">
+                        <input type="number" name="ano" class="form-control"
+                               value="<?= $edit_livro['ano'] ?? '' ?>">
                     </div>
 
                     <button class="btn btn-success w-100">
-                        Salvar Livro
+                        <?= $edit_livro ? "Salvar Alterações" : "Cadastrar Livro" ?>
                     </button>
+                    <?php if ($edit_livro): ?>
+                        <a href="livros.php" class="btn btn-secondary w-100 mt-2">Cancelar</a>
+                    <?php endif; ?>
                 </form>
 
             </div>
@@ -88,8 +107,8 @@ include __DIR__ . '/layout/header.php';
                         <tr>
                             <th>Título</th>
                             <th>Autor</th>
-                            <th>Editora</th>
                             <th>Ano</th>
+                            <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -102,8 +121,10 @@ include __DIR__ . '/layout/header.php';
                                 <tr>
                                     <td><?= htmlspecialchars($livro['titulo']) ?></td>
                                     <td><?= htmlspecialchars($livro['autor']) ?></td>
-                                    <td><?= htmlspecialchars($livro['editora']) ?></td>
                                     <td><?= $livro['ano'] ?></td>
+                                    <td>
+                                        <a href="?edit=<?= $livro['id'] ?>" class="btn btn-sm btn-warning">Editar</a>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
