@@ -6,19 +6,64 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// CADASTRAR OU EDITAR LEITOR
+/* =========================
+   EXCLUIR LEITOR (COM VALIDAÇÃO CORRETA)
+========================= */
+/* =========================
+   EXCLUIR LEITOR (REGRA FINAL CORRETA)
+========================= */
+if (isset($_GET['delete'])) {
+    $id = (int) $_GET['delete'];
+
+    if ($id > 0) {
+
+        // 1️⃣ Verificar empréstimos ATIVOS
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM emprestimos 
+            WHERE leitor_id = ? 
+              AND devolvido = 0
+        ");
+        $stmt->execute([$id]);
+        $emprestimosAtivos = $stmt->fetchColumn();
+
+        if ($emprestimosAtivos > 0) {
+            header("Location: leitores.php?erro=leitor_com_emprestimo_ativo");
+            exit;
+        }
+
+        // 2️⃣ Apagar empréstimos DEVOLVIDOS
+        $stmt = $pdo->prepare("
+            DELETE FROM emprestimos 
+            WHERE leitor_id = ? 
+              AND devolvido = 1
+        ");
+        $stmt->execute([$id]);
+
+        // 3️⃣ Agora sim, excluir o leitor
+        $stmt = $pdo->prepare("DELETE FROM leitores WHERE id = ?");
+        $stmt->execute([$id]);
+    }
+
+    header("Location: leitores.php?sucesso=leitor_excluido");
+    exit;
+}
+
+
+
+/* =========================
+   CADASTRAR OU EDITAR LEITOR
+========================= */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nome = $_POST['nome'] ?? '';
     $cpf = $_POST['cpf'] ?? '';
     $telefone = $_POST['telefone'] ?? '';
 
-    // Se existe id, é edição
     if (!empty($_POST['id'])) {
         $id = $_POST['id'];
         $stmt = $pdo->prepare("UPDATE leitores SET nome=?, cpf=?, telefone=? WHERE id=?");
         $stmt->execute([$nome, $cpf, $telefone, $id]);
     } else {
-        // Cadastro novo
         if ($nome) {
             $stmt = $pdo->prepare("INSERT INTO leitores (nome, cpf, telefone) VALUES (?, ?, ?)");
             $stmt->execute([$nome, $cpf, $telefone]);
@@ -29,11 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// LISTAR LEITORES
+/* =========================
+   LISTAR LEITORES
+========================= */
 $stmt = $pdo->query("SELECT * FROM leitores ORDER BY id DESC");
 $leitores = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// EDITAR LEITOR (preencher formulário)
+/* =========================
+   EDITAR LEITOR
+========================= */
 $edit_leitor = null;
 if (isset($_GET['edit'])) {
     $id = $_GET['edit'];
@@ -47,11 +96,23 @@ include __DIR__ . '/layout/header.php';
 
 <h2>👤 Leitores</h2>
 
+<?php if (isset($_GET['erro']) && $_GET['erro'] === 'leitor_com_emprestimo_ativo'): ?>
+    <div class="alert alert-danger mt-3">
+        ❌ Não é possível excluir este leitor porque ele possui empréstimo ativo.
+    </div>
+<?php endif; ?>
+
+<?php if (isset($_GET['sucesso']) && $_GET['sucesso'] === 'leitor_excluido'): ?>
+    <div class="alert alert-success mt-3">
+        ✅ Leitor excluído com sucesso.
+    </div>
+<?php endif; ?>
+
 <div class="row mt-4">
 
     <!-- FORMULÁRIO -->
     <div class="col-md-4">
-        <div class="card">
+        <div class="card shadow-sm">
             <div class="card-header bg-success text-white">
                 <?= $edit_leitor ? "Editar Leitor" : "Cadastrar Leitor" ?>
             </div>
@@ -71,14 +132,12 @@ include __DIR__ . '/layout/header.php';
                     <div class="mb-3">
                         <label class="form-label">CPF</label>
                         <input type="text" name="cpf" class="form-control"
-                               placeholder="000.000.000-00"
                                value="<?= $edit_leitor['cpf'] ?? '' ?>">
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Telefone</label>
                         <input type="text" name="telefone" class="form-control"
-                               placeholder="(00) 00000-0000"
                                value="<?= $edit_leitor['telefone'] ?? '' ?>">
                     </div>
 
@@ -97,19 +156,19 @@ include __DIR__ . '/layout/header.php';
 
     <!-- LISTAGEM -->
     <div class="col-md-8">
-        <div class="card">
+        <div class="card shadow-sm">
             <div class="card-header bg-dark text-white">
                 Leitores Cadastrados
             </div>
             <div class="card-body">
 
-                <table class="table table-striped">
+                <table class="table table-striped align-middle">
                     <thead>
                         <tr>
                             <th>Nome</th>
                             <th>CPF</th>
                             <th>Telefone</th>
-                            <th>Ações</th>
+                            <th style="width:160px">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -124,7 +183,15 @@ include __DIR__ . '/layout/header.php';
                                     <td><?= htmlspecialchars($leitor['cpf']) ?></td>
                                     <td><?= htmlspecialchars($leitor['telefone']) ?></td>
                                     <td>
-                                        <a href="?edit=<?= $leitor['id'] ?>" class="btn btn-sm btn-warning">Editar</a>
+                                        <a href="?edit=<?= $leitor['id'] ?>" class="btn btn-sm btn-warning">
+                                            Editar
+                                        </a>
+
+                                        <a href="?delete=<?= $leitor['id'] ?>"
+                                           class="btn btn-sm btn-danger"
+                                           onclick="return confirm('Tem certeza que deseja excluir este leitor?')">
+                                            Excluir
+                                        </a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

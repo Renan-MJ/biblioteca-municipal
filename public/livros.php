@@ -6,41 +6,71 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+$mensagem = null;
+$tipoMensagem = 'success';
+
+// ==============================
+// EXCLUIR LIVRO
+// ==============================
+if (isset($_GET['delete'])) {
+    $id = $_GET['delete'];
+
+    // Verificar se existe empréstimo relacionado
+    $check = $pdo->prepare("SELECT COUNT(*) FROM emprestimos WHERE livro_id = ?");
+    $check->execute([$id]);
+    $total = $check->fetchColumn();
+
+    if ($total > 0) {
+        $mensagem = "❌ Não é possível excluir este livro pois ele possui empréstimos registrados.";
+        $tipoMensagem = "danger";
+    } else {
+        $stmt = $pdo->prepare("DELETE FROM livros WHERE id = ?");
+        $stmt->execute([$id]);
+        $mensagem = "✅ Livro excluído com sucesso.";
+    }
+}
+
+// ==============================
 // CADASTRAR OU EDITAR LIVRO
+// ==============================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $titulo = $_POST['titulo'] ?? '';
     $autor = $_POST['autor'] ?? '';
     $ano = !empty($_POST['ano']) ? $_POST['ano'] : null;
 
-    // Se existe id, é edição
     if (!empty($_POST['id'])) {
+        // EDIÇÃO
         $id = $_POST['id'];
         $stmt = $pdo->prepare("UPDATE livros SET titulo=?, autor=?, ano=? WHERE id=?");
         $stmt->execute([$titulo, $autor, $ano, $id]);
+        $mensagem = "✏️ Livro atualizado com sucesso.";
     } else {
-        // Cadastro novo
-        $quantidade = 1;
+        // CADASTRO
         if ($titulo && $autor) {
-            $stmt = $pdo->prepare("INSERT INTO livros (titulo, autor, ano, quantidade) VALUES (?, ?, ?, ?)");
+            $quantidade = 1;
+            $stmt = $pdo->prepare(
+                "INSERT INTO livros (titulo, autor, ano, quantidade) VALUES (?, ?, ?, ?)"
+            );
             $stmt->execute([$titulo, $autor, $ano, $quantidade]);
+            $mensagem = "📚 Livro cadastrado com sucesso.";
         }
     }
-
-    header("Location: livros.php");
-    exit;
 }
 
+// ==============================
 // LISTAR LIVROS
+// ==============================
 $stmt = $pdo->query("SELECT * FROM livros ORDER BY id DESC");
 $livros = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// EDITAR LIVRO (preencher formulário)
+// ==============================
+// EDITAR LIVRO
+// ==============================
 $edit_livro = null;
 if (isset($_GET['edit'])) {
-    $id = $_GET['edit'];
-    $stmt = $pdo->prepare("SELECT * FROM livros WHERE id=?");
-    $stmt->execute([$id]);
+    $stmt = $pdo->prepare("SELECT * FROM livros WHERE id = ?");
+    $stmt->execute([$_GET['edit']]);
     $edit_livro = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
@@ -48,6 +78,12 @@ include __DIR__ . '/layout/header.php';
 ?>
 
 <h2>📚 Livros</h2>
+
+<?php if ($mensagem): ?>
+    <div class="alert alert-<?= $tipoMensagem ?> mt-3">
+        <?= $mensagem ?>
+    </div>
+<?php endif; ?>
 
 <div class="row mt-4">
 
@@ -85,6 +121,7 @@ include __DIR__ . '/layout/header.php';
                     <button class="btn btn-success w-100">
                         <?= $edit_livro ? "Salvar Alterações" : "Cadastrar Livro" ?>
                     </button>
+
                     <?php if ($edit_livro): ?>
                         <a href="livros.php" class="btn btn-secondary w-100 mt-2">Cancelar</a>
                     <?php endif; ?>
@@ -108,7 +145,7 @@ include __DIR__ . '/layout/header.php';
                             <th>Título</th>
                             <th>Autor</th>
                             <th>Ano</th>
-                            <th>Ações</th>
+                            <th style="width:160px">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -123,7 +160,14 @@ include __DIR__ . '/layout/header.php';
                                     <td><?= htmlspecialchars($livro['autor']) ?></td>
                                     <td><?= $livro['ano'] ?></td>
                                     <td>
-                                        <a href="?edit=<?= $livro['id'] ?>" class="btn btn-sm btn-warning">Editar</a>
+                                        <a href="?edit=<?= $livro['id'] ?>" class="btn btn-sm btn-warning">
+                                            Editar
+                                        </a>
+                                        <a href="?delete=<?= $livro['id'] ?>"
+                                           class="btn btn-sm btn-danger"
+                                           onclick="return confirm('Tem certeza que deseja excluir este livro?')">
+                                            Excluir
+                                        </a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
