@@ -5,6 +5,9 @@ require_once __DIR__ . '/../config/database.php';
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+$erro = null;
+$sucesso = null;
+
 
 // ==============================
 // DEVOLVER LIVRO
@@ -55,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $check->execute([$livro_id]);
                     $novo_livro = $check->fetch();
                     if (!$novo_livro || $novo_livro['quantidade'] <= 0) {
-                        die("❌ Livro novo sem estoque disponível.");
+                        $erro = "❌ O livro selecionado não possui estoque disponível.";
                     }
 
                     // Aumentar estoque do livro antigo
@@ -88,21 +91,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $check->execute([$livro_id]);
             $livro = $check->fetch();
             if (!$livro || $livro['quantidade'] <= 0) {
-                die("❌ Livro sem estoque disponível.");
+                $erro = "❌ Livro sem estoque disponível para empréstimo.";
             }
 
-            // Inserir empréstimo
-            $pdo->prepare("
-                INSERT INTO emprestimos (livro_id, leitor_id, data_emprestimo, data_devolucao, devolvido)
-                VALUES (?, ?, ?, ?, 0)
-            ")->execute([$livro_id, $leitor_id, $data_emprestimo, $data_devolucao]);
+            if (!$erro) {
+                // Inserir empréstimo
+                $pdo->prepare("
+                    INSERT INTO emprestimos (livro_id, leitor_id, data_emprestimo, data_devolucao, devolvido)
+                    VALUES (?, ?, ?, ?, 0)
+                ")->execute([$livro_id, $leitor_id, $data_emprestimo, $data_devolucao]);
 
-            // Diminuir estoque
-            $pdo->prepare("UPDATE livros SET quantidade = quantidade - 1 WHERE id = ? AND quantidade > 0")
-                ->execute([$livro_id]);
+                // Diminuir estoque
+                $pdo->prepare("UPDATE livros SET quantidade = quantidade - 1 WHERE id = ? AND quantidade > 0")
+                    ->execute([$livro_id]);
 
-            header("Location: emprestimos.php");
-            exit;
+                $sucesso = "📚 Empréstimo registrado com sucesso!";
+            }
+
         }
     }
 }
@@ -145,6 +150,19 @@ include __DIR__ . '/layout/header.php';
 ?>
 
 <h2>🔄 Empréstimos</h2>
+
+<?php if ($erro): ?>
+    <div class="alert alert-danger">
+        <?= $erro ?>
+    </div>
+<?php endif; ?>
+
+<?php if ($sucesso): ?>
+    <div class="alert alert-success">
+        <?= $sucesso ?>
+    </div>
+<?php endif; ?>
+
 
 <div class="row mt-4">
 
