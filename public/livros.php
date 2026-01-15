@@ -1,12 +1,37 @@
 <?php
+require_once __DIR__ . '/../config/database.php';
+
+// MOSTRAR ERROS (apenas desenvolvimento)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+// CADASTRAR LIVRO
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $titulo = $_POST['titulo'] ?? '';
+    $autor = $_POST['autor'] ?? '';
+    $editora = $_POST['editora'] ?? '';
+    $ano = !empty($_POST['ano']) ? $_POST['ano'] : null;
+    $quantidade = 1;
+
+    if ($titulo && $autor) {
+        $sql = "INSERT INTO livros (titulo, autor, editora, ano, quantidade)
+                VALUES (?, ?, ?, ?, ?)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$titulo, $autor, $editora, $ano, $quantidade]);
+    }
+
+    header("Location: livros.php");
+    exit;
+}
+
+// LISTAR LIVROS
+$stmt = $pdo->query("SELECT * FROM livros ORDER BY id DESC");
+$livros = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 include __DIR__ . '/layout/header.php';
 ?>
 
-<?php include 'layout/header.php'; ?>
 
 <h2>📚 Livros</h2>
 
@@ -20,25 +45,25 @@ include __DIR__ . '/layout/header.php';
             </div>
             <div class="card-body">
 
-                <form>
+                <form method="POST">
                     <div class="mb-3">
                         <label class="form-label">Título</label>
-                        <input type="text" class="form-control">
+                        <input type="text" name="titulo" class="form-control" required>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Autor</label>
-                        <input type="text" class="form-control">
+                        <input type="text" name="autor" class="form-control" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Categoria</label>
-                        <input type="text" class="form-control">
+                        <label class="form-label">Editora</label>
+                        <input type="text" name="editora" class="form-control">
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Ano</label>
-                        <input type="number" class="form-control">
+                        <input type="number" name="ano" class="form-control">
                     </div>
 
                     <button class="btn btn-success w-100">
@@ -63,42 +88,25 @@ include __DIR__ . '/layout/header.php';
                         <tr>
                             <th>Título</th>
                             <th>Autor</th>
-                            <th>Categoria</th>
+                            <th>Editora</th>
                             <th>Ano</th>
-                            <th>Status</th>
-                            <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
-
-                        <tr>
-                            <td>Dom Casmurro</td>
-                            <td>Machado de Assis</td>
-                            <td>Literatura</td>
-                            <td>1899</td>
-                            <td>
-                                <span class="badge bg-success">Disponível</span>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-warning">Editar</button>
-                                <button class="btn btn-sm btn-danger">Excluir</button>
-                            </td>
-                        </tr>
-
-                        <tr>
-                            <td>O Pequeno Príncipe</td>
-                            <td>Antoine de Saint-Exupéry</td>
-                            <td>Infantil</td>
-                            <td>1943</td>
-                            <td>
-                                <span class="badge bg-danger">Emprestado</span>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-warning">Editar</button>
-                                <button class="btn btn-sm btn-danger">Excluir</button>
-                            </td>
-                        </tr>
-
+                        <?php if (count($livros) === 0): ?>
+                            <tr>
+                                <td colspan="4">Nenhum livro cadastrado</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($livros as $livro): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($livro['titulo']) ?></td>
+                                    <td><?= htmlspecialchars($livro['autor']) ?></td>
+                                    <td><?= htmlspecialchars($livro['editora']) ?></td>
+                                    <td><?= $livro['ano'] ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
 
@@ -109,4 +117,3 @@ include __DIR__ . '/layout/header.php';
 </div>
 
 <?php include __DIR__ . '/layout/footer.php'; ?>
-
