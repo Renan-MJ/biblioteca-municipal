@@ -48,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $cpf = trim($_POST['cpf'] ?? '');
     $telefone = trim($_POST['telefone'] ?? '');
 
-    // 👉 VALIDAÇÃO OBRIGATÓRIA
     if ($nome === '' || $cpf === '' || $telefone === '') {
         header("Location: leitores.php?erro=campos_obrigatorios");
         exit;
@@ -136,7 +135,6 @@ include __DIR__ . '/layout/header.php';
                                name="cpf"
                                id="cpf"
                                class="form-control"
-                               maxlength="14"
                                value="<?= $edit_leitor['cpf'] ?? '' ?>"
                                placeholder="000.000.000-00"
                                required>
@@ -144,7 +142,10 @@ include __DIR__ . '/layout/header.php';
 
                     <div class="mb-3">
                         <label class="form-label">Telefone</label>
-                        <input type="text" name="telefone" class="form-control"
+                        <input type="text"
+                               name="telefone"
+                               id="telefone"
+                               class="form-control"
                                value="<?= $edit_leitor['telefone'] ?? '' ?>"
                                placeholder="(00) 00000-0000"
                                required>
@@ -230,17 +231,38 @@ document.getElementById('buscaLeitor').addEventListener('keyup', function () {
     });
 });
 
-// 👉 MÁSCARA CPF
-document.getElementById('cpf').addEventListener('input', function () {
-    let v = this.value.replace(/\D/g, '');
-    v = v.slice(0, 11);
+// =========================
+// MÁSCARAS (APAGA NORMAL)
+// =========================
+function somenteNumeros(valor, limite) {
+    return valor.replace(/\D/g, '').slice(0, limite);
+}
 
-    if (v.length >= 9) {
+// CPF
+document.getElementById('cpf').addEventListener('input', function () {
+    let v = somenteNumeros(this.value, 11);
+
+    if (v.length > 9) {
         this.value = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4');
-    } else if (v.length >= 6) {
+    } else if (v.length > 6) {
         this.value = v.replace(/(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3');
-    } else if (v.length >= 3) {
+    } else if (v.length > 3) {
         this.value = v.replace(/(\d{3})(\d{0,3})/, '$1.$2');
+    } else {
+        this.value = v;
+    }
+});
+
+// TELEFONE (limite 11 dígitos)
+document.getElementById('telefone').addEventListener('input', function () {
+    let v = somenteNumeros(this.value, 11);
+
+    if (v.length > 10) {
+        this.value = v.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    } else if (v.length > 6) {
+        this.value = v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    } else if (v.length > 2) {
+        this.value = v.replace(/(\d{2})(\d{0,5})/, '($1) $2');
     } else {
         this.value = v;
     }
