@@ -9,9 +9,9 @@ error_reporting(E_ALL);
 $mensagem = null;
 $tipoMensagem = 'success';
 
-// ==============================
-// EXCLUIR LIVRO
-// ==============================
+/* ==============================
+   EXCLUIR LIVRO
+============================== */
 if (isset($_GET['delete'])) {
     $id = $_GET['delete'];
 
@@ -29,14 +29,14 @@ if (isset($_GET['delete'])) {
     }
 }
 
-// ==============================
-// CADASTRAR OU EDITAR LIVRO
-// ==============================
+/* ==============================
+   CADASTRAR OU EDITAR LIVRO
+============================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $titulo = $_POST['titulo'] ?? '';
-    $autor = $_POST['autor'] ?? '';
-    $ano = !empty($_POST['ano']) ? $_POST['ano'] : null;
+    $autor  = $_POST['autor'] ?? '';
+    $ano    = !empty($_POST['ano']) ? $_POST['ano'] : null;
 
     if (!empty($_POST['id'])) {
         $id = $_POST['id'];
@@ -55,15 +55,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// ==============================
-// LISTAR LIVROS
-// ==============================
-$stmt = $pdo->query("SELECT * FROM livros ORDER BY id DESC");
+/* ==============================
+   LISTAR LIVROS
+============================== */
+$stmt = $pdo->query("SELECT * FROM livros ORDER BY titulo ASC");
 $livros = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ==============================
-// EDITAR LIVRO
-// ==============================
+/* ==============================
+   EDITAR LIVRO
+============================== */
 $edit_livro = null;
 if (isset($_GET['edit'])) {
     $stmt = $pdo->prepare("SELECT * FROM livros WHERE id = ?");
@@ -99,7 +99,7 @@ include __DIR__ . '/layout/header.php';
                     <?php endif; ?>
 
                     <div class="mb-3">
-                        <label class="form-label">Título do Livro</label>
+                        <label class="form-label">Título</label>
                         <input type="text"
                                name="titulo"
                                class="form-control"
@@ -119,7 +119,7 @@ include __DIR__ . '/layout/header.php';
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Ano de Publicação</label>
+                        <label class="form-label">Ano</label>
                         <input type="number"
                                name="ano"
                                class="form-control"
@@ -145,24 +145,26 @@ include __DIR__ . '/layout/header.php';
     <!-- LISTAGEM -->
     <div class="col-md-8">
         <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white fw-semibold">
-                📋 Livros Cadastrados
+            <div class="card-header bg-dark text-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>📋 Livros Cadastrados</span>
+                <small class="text-light"><?= count($livros) ?> registros</small>
             </div>
 
-            <div class="card-body p-0">
-                <table class="table table-striped table-hover mb-0 align-middle">
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
                             <th>Título</th>
                             <th>Autor</th>
                             <th>Ano</th>
+                            <th>Estoque</th>
                             <th class="text-center" style="width:180px">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (count($livros) === 0): ?>
                             <tr>
-                                <td colspan="4" class="text-center text-muted py-4">
+                                <td colspan="5" class="text-center text-muted py-4">
                                     Nenhum livro cadastrado
                                 </td>
                             </tr>
@@ -171,7 +173,18 @@ include __DIR__ . '/layout/header.php';
                                 <tr>
                                     <td><?= htmlspecialchars($livro['titulo']) ?></td>
                                     <td><?= htmlspecialchars($livro['autor']) ?></td>
-                                    <td><?= $livro['ano'] ?></td>
+                                    <td><?= $livro['ano'] ?: '-' ?></td>
+                                    <td>
+                                        <?php if ($livro['quantidade'] > 0): ?>
+                                            <span class="badge bg-success">
+                                                <?= $livro['quantidade'] ?> disponível
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="badge bg-danger">
+                                                Sem estoque
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="text-center">
                                         <a href="?edit=<?= $livro['id'] ?>" class="btn btn-sm btn-warning">
                                             ✏️ Editar
