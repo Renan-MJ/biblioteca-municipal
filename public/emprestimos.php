@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 
-
 /**
  * ==============================
  * CONFIGURAÇÃO DE ERROS (DEV)
@@ -149,12 +148,11 @@ $leitores = $pdo->query("SELECT id, nome FROM leitores ORDER BY nome")->fetchAll
 
 /**
  * ==============================
- * PAGINAÇÃO (ADICIONADO)
+ * PAGINAÇÃO
  * ==============================
  */
 $limite = 10;
-$pagina = isset($_GET['page']) ? (int) $_GET['page'] : 1;
-$pagina = max($pagina, 1);
+$pagina = isset($_GET['page']) ? max((int)$_GET['page'], 1) : 1;
 $offset = ($pagina - 1) * $limite;
 
 $totalEmprestimos = $pdo->query("SELECT COUNT(*) FROM emprestimos")->fetchColumn();
@@ -162,7 +160,7 @@ $totalPaginas = ceil($totalEmprestimos / $limite);
 
 /**
  * ==============================
- * LISTAR EMPRÉSTIMOS (PAGINADO)
+ * LISTAR EMPRÉSTIMOS
  * ==============================
  */
 $stmt = $pdo->prepare("
@@ -172,7 +170,8 @@ $stmt = $pdo->prepare("
         r.nome AS leitor,
         e.data_emprestimo,
         e.data_devolucao,
-        e.devolvido
+        e.devolvido,
+        (e.devolvido = 0 AND e.data_devolucao < CURDATE()) AS atrasado
     FROM emprestimos e
     JOIN livros l ON l.id = e.livro_id
     JOIN leitores r ON r.id = e.leitor_id
@@ -184,10 +183,28 @@ $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $emprestimos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+/**
+ * ==============================
+ * CONTADOR DE ATRASADOS
+ * ==============================
+ */
+$qtdAtrasados = $pdo->query("
+    SELECT COUNT(*) 
+    FROM emprestimos
+    WHERE devolvido = 0
+      AND data_devolucao < CURDATE()
+")->fetchColumn();
+
 include __DIR__ . '/layout/header.php';
 ?>
 
 <h2 class="mb-4">🔄 Gestão de Empréstimos</h2>
+
+<?php if ($qtdAtrasados > 0): ?>
+    <div class="alert alert-danger shadow-sm">
+        ⚠️ Existem <strong><?= $qtdAtrasados ?></strong> empréstimo(s) atrasado(s).
+    </div>
+<?php endif; ?>
 
 <?php if ($erro): ?>
     <div class="alert alert-danger shadow-sm"><?= $erro ?></div>
@@ -204,7 +221,6 @@ include __DIR__ . '/layout/header.php';
 
             <div class="card-body">
                 <form method="POST">
-
                     <?php if ($editar_emprestimo): ?>
                         <input type="hidden" name="editar_id" value="<?= $editar_emprestimo['id'] ?>">
                     <?php endif; ?>
@@ -251,12 +267,6 @@ include __DIR__ . '/layout/header.php';
                     <button class="btn btn-dark w-100">
                         <?= $editar_emprestimo ? "Salvar Alterações" : "Registrar Empréstimo" ?>
                     </button>
-
-                    <?php if ($editar_emprestimo): ?>
-                        <a href="emprestimos.php" class="btn btn-outline-secondary w-100 mt-2">
-                            Cancelar
-                        </a>
-                    <?php endif; ?>
                 </form>
             </div>
         </div>
@@ -286,15 +296,21 @@ include __DIR__ . '/layout/header.php';
                     </thead>
                     <tbody>
                         <?php foreach ($emprestimos as $e): ?>
-                            <tr>
+                            <tr class="<?= $e['atrasado'] ? 'table-danger' : '' ?>">
                                 <td><?= htmlspecialchars($e['livro']) ?></td>
                                 <td><?= htmlspecialchars($e['leitor']) ?></td>
                                 <td><?= date('d/m/Y', strtotime($e['data_emprestimo'])) ?></td>
                                 <td><?= $e['data_devolucao'] ? date('d/m/Y', strtotime($e['data_devolucao'])) : '-' ?></td>
                                 <td>
-                                    <?= $e['devolvido']
-                                        ? '<span class="badge bg-success">Devolvido</span>'
-                                        : '<span class="badge bg-warning text-dark">Em aberto</span>' ?>
+                                    <?php
+                                        if ($e['devolvido']) {
+                                            echo '<span class="badge bg-success">Devolvido</span>';
+                                        } elseif ($e['atrasado']) {
+                                            echo '<span class="badge bg-danger">Atrasado</span>';
+                                        } else {
+                                            echo '<span class="badge bg-warning text-dark">Em aberto</span>';
+                                        }
+                                    ?>
                                 </td>
                                 <td class="text-center">
                                     <?php if (!$e['devolvido']): ?>
@@ -315,7 +331,6 @@ include __DIR__ . '/layout/header.php';
                 </table>
             </div>
 
-            <!-- PAGINAÇÃO -->
             <?php if ($totalPaginas > 1): ?>
                 <div class="card-footer">
                     <nav>
@@ -344,7 +359,6 @@ include __DIR__ . '/layout/header.php';
 </div>
 
 <script>
-// BUSCA EMPRÉSTIMOS
 document.getElementById('buscaEmprestimo').addEventListener('keyup', function () {
     const termo = this.value.toLowerCase();
     document.querySelectorAll('#tabelaEmprestimos tbody tr').forEach(tr => {
