@@ -56,9 +56,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /* ==============================
-   LISTAR LIVROS
+   PAGINAÇÃO (ADICIONADO)
 ============================== */
-$stmt = $pdo->query("SELECT * FROM livros ORDER BY titulo ASC");
+$limite = 10;
+$pagina = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+$pagina = max($pagina, 1);
+$offset = ($pagina - 1) * $limite;
+
+$totalLivros = $pdo->query("SELECT COUNT(*) FROM livros")->fetchColumn();
+$totalPaginas = ceil($totalLivros / $limite);
+
+/* ==============================
+   LISTAR LIVROS (COM PAGINAÇÃO)
+============================== */
+$stmt = $pdo->prepare("SELECT * FROM livros ORDER BY titulo ASC LIMIT :limite OFFSET :offset");
+$stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
 $livros = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 /* ==============================
@@ -145,13 +159,18 @@ include __DIR__ . '/layout/header.php';
     <!-- LISTAGEM -->
     <div class="col-md-8">
         <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white fw-semibold d-flex justify-content-between align-items-center">
+            <div class="card-header bg-dark text-white fw-semibold d-flex justify-content-between align-items-center gap-2">
                 <span>📋 Livros Cadastrados</span>
-                <small class="text-light"><?= count($livros) ?> registros</small>
+
+                <!-- 🔍 BUSCA -->
+                <input type="text"
+                       id="buscaLivro"
+                       class="form-control form-control-sm w-50"
+                       placeholder="Buscar por título, autor ou ano">
             </div>
 
             <div class="card-body p-0 table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0" id="tabelaLivros">
                     <thead class="table-light">
                         <tr>
                             <th>Título</th>
@@ -201,9 +220,43 @@ include __DIR__ . '/layout/header.php';
                     </tbody>
                 </table>
             </div>
+
+            <!-- PAGINAÇÃO (ADICIONADO) -->
+            <?php if ($totalPaginas > 1): ?>
+                <div class="card-footer">
+                    <nav>
+                        <ul class="pagination justify-content-center mb-0">
+                            <li class="page-item <?= $pagina <= 1 ? 'disabled' : '' ?>">
+                                <a class="page-link" href="?page=<?= $pagina - 1 ?>">Anterior</a>
+                            </li>
+
+                            <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
+                                <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
+                                </li>
+                            <?php endfor; ?>
+
+                            <li class="page-item <?= $pagina >= $totalPaginas ? 'disabled' : '' ?>">
+                                <a class="page-link" href="?page=<?= $pagina + 1 ?>">Próxima</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            <?php endif; ?>
+
         </div>
     </div>
 
 </div>
+
+<script>
+// 🔍 BUSCA POR TÍTULO, AUTOR E ANO
+document.getElementById('buscaLivro').addEventListener('keyup', function () {
+    const termo = this.value.toLowerCase();
+    document.querySelectorAll('#tabelaLivros tbody tr').forEach(tr => {
+        tr.style.display = tr.innerText.toLowerCase().includes(termo) ? '' : 'none';
+    });
+});
+</script>
 
 <?php include __DIR__ . '/layout/footer.php'; ?>

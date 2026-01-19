@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 
+
 /**
  * ==============================
  * CONFIGURAÇÃO DE ERROS (DEV)
@@ -148,10 +149,23 @@ $leitores = $pdo->query("SELECT id, nome FROM leitores ORDER BY nome")->fetchAll
 
 /**
  * ==============================
- * LISTAR EMPRÉSTIMOS
+ * PAGINAÇÃO (ADICIONADO)
  * ==============================
  */
-$emprestimos = $pdo->query("
+$limite = 10;
+$pagina = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+$pagina = max($pagina, 1);
+$offset = ($pagina - 1) * $limite;
+
+$totalEmprestimos = $pdo->query("SELECT COUNT(*) FROM emprestimos")->fetchColumn();
+$totalPaginas = ceil($totalEmprestimos / $limite);
+
+/**
+ * ==============================
+ * LISTAR EMPRÉSTIMOS (PAGINADO)
+ * ==============================
+ */
+$stmt = $pdo->prepare("
     SELECT 
         e.id,
         l.titulo AS livro,
@@ -163,7 +177,12 @@ $emprestimos = $pdo->query("
     JOIN livros l ON l.id = e.livro_id
     JOIN leitores r ON r.id = e.leitor_id
     ORDER BY e.id DESC
-")->fetchAll(PDO::FETCH_ASSOC);
+    LIMIT :limite OFFSET :offset
+");
+$stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
+$emprestimos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 include __DIR__ . '/layout/header.php';
 ?>
@@ -295,13 +314,37 @@ include __DIR__ . '/layout/header.php';
                     </tbody>
                 </table>
             </div>
+
+            <!-- PAGINAÇÃO -->
+            <?php if ($totalPaginas > 1): ?>
+                <div class="card-footer">
+                    <nav>
+                        <ul class="pagination justify-content-center mb-0">
+                            <li class="page-item <?= $pagina <= 1 ? 'disabled' : '' ?>">
+                                <a class="page-link" href="?page=<?= $pagina - 1 ?>">Anterior</a>
+                            </li>
+
+                            <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
+                                <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
+                                </li>
+                            <?php endfor; ?>
+
+                            <li class="page-item <?= $pagina >= $totalPaginas ? 'disabled' : '' ?>">
+                                <a class="page-link" href="?page=<?= $pagina + 1 ?>">Próxima</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            <?php endif; ?>
+
         </div>
     </div>
 
 </div>
 
 <script>
-// BUSCA EMPRÉSTIMOS (LIVRO OU LEITOR)
+// BUSCA EMPRÉSTIMOS
 document.getElementById('buscaEmprestimo').addEventListener('keyup', function () {
     const termo = this.value.toLowerCase();
     document.querySelectorAll('#tabelaEmprestimos tbody tr').forEach(tr => {

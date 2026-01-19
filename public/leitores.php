@@ -67,11 +67,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+/* =========================
+   PAGINAÇÃO (ADICIONADO)
+========================= */
+$limite = 10;
+$pagina = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+$pagina = max($pagina, 1);
+$offset = ($pagina - 1) * $limite;
+
+$totalLeitores = $pdo->query("SELECT COUNT(*) FROM leitores")->fetchColumn();
+$totalPaginas = ceil($totalLeitores / $limite);
+
 // =========================
-// LISTAGEM
+// LISTAGEM (COM PAGINAÇÃO)
 // =========================
-$leitores = $pdo->query("SELECT * FROM leitores ORDER BY id DESC")
-                ->fetchAll(PDO::FETCH_ASSOC);
+$stmt = $pdo->prepare("
+    SELECT * 
+    FROM leitores 
+    ORDER BY id DESC 
+    LIMIT :limite OFFSET :offset
+");
+$stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
+$leitores = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // =========================
 // EDITAR
@@ -217,6 +236,30 @@ include __DIR__ . '/layout/header.php';
                     </tbody>
                 </table>
             </div>
+
+            <!-- PAGINAÇÃO -->
+            <?php if ($totalPaginas > 1): ?>
+                <div class="card-footer">
+                    <nav>
+                        <ul class="pagination justify-content-center mb-0">
+                            <li class="page-item <?= $pagina <= 1 ? 'disabled' : '' ?>">
+                                <a class="page-link" href="?page=<?= $pagina - 1 ?>">Anterior</a>
+                            </li>
+
+                            <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
+                                <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
+                                </li>
+                            <?php endfor; ?>
+
+                            <li class="page-item <?= $pagina >= $totalPaginas ? 'disabled' : '' ?>">
+                                <a class="page-link" href="?page=<?= $pagina + 1 ?>">Próxima</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            <?php endif; ?>
+
         </div>
     </div>
 
@@ -232,7 +275,7 @@ document.getElementById('buscaLeitor').addEventListener('keyup', function () {
 });
 
 // =========================
-// MÁSCARAS (APAGA NORMAL)
+// MÁSCARAS
 // =========================
 function somenteNumeros(valor, limite) {
     return valor.replace(/\D/g, '').slice(0, limite);
@@ -253,7 +296,7 @@ document.getElementById('cpf').addEventListener('input', function () {
     }
 });
 
-// TELEFONE (limite 11 dígitos)
+// TELEFONE
 document.getElementById('telefone').addEventListener('input', function () {
     let v = somenteNumeros(this.value, 11);
 
