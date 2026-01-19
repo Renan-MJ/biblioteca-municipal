@@ -131,7 +131,7 @@ include __DIR__ . '/layout/header.php';
     <div class="col-md-4">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-success text-white fw-semibold">
-                <?= $edit_leitor ? "Editar Leitor" : "Cadastrar Leitor" ?>
+                <?= $edit_leitor ? "Editar Leitor" : "➕ Cadastrar Leitor" ?>
             </div>
 
             <div class="card-body">

@@ -142,7 +142,7 @@ include __DIR__ . '/layout/header.php';
                     </div>
 
                     <button class="btn btn-success w-100 shadow-sm">
-                        💾 <?= $edit_livro ? "Salvar Alterações" : "Cadastrar Livro" ?>
+                             <?= $edit_livro ? "Salvar Alterações" : "Cadastrar Livro" ?>
                     </button>
 
                     <?php if ($edit_livro): ?>
