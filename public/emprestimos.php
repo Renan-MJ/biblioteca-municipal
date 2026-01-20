@@ -255,13 +255,13 @@ include __DIR__ . '/layout/header.php';
                     <div class="mb-3">
                         <label class="form-label">Data do Empréstimo</label>
                         <input type="date" name="data_emprestimo" class="form-control"
-                               value="<?= $editar_emprestimo['data_emprestimo'] ?? '' ?>" required>
+                               value="<?= $editar_emprestimo['data_emprestimo'] ?? date('Y-m-d') ?>" required>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Data de Devolução</label>
                         <input type="date" name="data_devolucao" class="form-control"
-                               value="<?= $editar_emprestimo['data_devolucao'] ?? '' ?>">
+                               value="<?= $editar_emprestimo['data_devolucao'] ?? '' ?>" required>
                     </div>
 
                     <button class="btn btn-dark w-100">
