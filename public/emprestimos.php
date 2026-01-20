@@ -52,75 +52,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['devolver_id'])) {
 
     if ($livro_id && $leitor_id && $data_emprestimo) {
 
-        if ($editar_id) {
+        // Validação de datas: garantir que data_devolucao não seja anterior à data_emprestimo
+        if ($data_devolucao) {
+            $dEmp = DateTime::createFromFormat('Y-m-d', $data_emprestimo);
+            $dDev = DateTime::createFromFormat('Y-m-d', $data_devolucao);
 
-            $stmt = $pdo->prepare("SELECT livro_id FROM emprestimos WHERE id = ?");
-            $stmt->execute([$editar_id]);
-            $antigo = $stmt->fetch();
+            if (!$dEmp || !$dDev) {
+                $erro = "❌ Formato de data inválido.";
+            } elseif ($dDev < $dEmp) {
+                $erro = "❌ A data de devolução não pode ser anterior à data de empréstimo.";
+            }
+        }
 
-            if ($antigo && $antigo['livro_id'] != $livro_id) {
+        if (!$erro) {
+
+            if ($editar_id) {
+
+                // buscar empréstimo antigo antes de alterar estoque
+                $stmt = $pdo->prepare("SELECT livro_id FROM emprestimos WHERE id = ?");
+                $stmt->execute([$editar_id]);
+                $antigo = $stmt->fetch();
+
+                if ($antigo && $antigo['livro_id'] != $livro_id) {
+
+                    $check = $pdo->prepare("SELECT quantidade FROM livros WHERE id = ?");
+                    $check->execute([$livro_id]);
+                    $novo = $check->fetch();
+
+                    if (!$novo || $novo['quantidade'] <= 0) {
+                        $erro = "❌ O livro selecionado não possui estoque.";
+                    } else {
+                        // devolver o antigo livro e retirar o novo
+                        $pdo->prepare("UPDATE livros SET quantidade = quantidade + 1 WHERE id = ?")
+                            ->execute([$antigo['livro_id']]);
+
+                        $pdo->prepare("UPDATE livros SET quantidade = quantidade - 1 WHERE id = ?")
+                            ->execute([$livro_id]);
+                    }
+                }
+
+                if (!$erro) {
+                    $pdo->prepare("
+                        UPDATE emprestimos SET
+                            livro_id = ?,
+                            leitor_id = ?,
+                            data_emprestimo = ?,
+                            data_devolucao = ?
+                        WHERE id = ?
+                    ")->execute([
+                        $livro_id,
+                        $leitor_id,
+                        $data_emprestimo,
+                        $data_devolucao,
+                        $editar_id
+                    ]);
+
+                    header("Location: emprestimos.php?sucesso=editado");
+                    exit;
+                }
+
+            } else {
 
                 $check = $pdo->prepare("SELECT quantidade FROM livros WHERE id = ?");
                 $check->execute([$livro_id]);
-                $novo = $check->fetch();
+                $livro = $check->fetch();
 
-                if (!$novo || $novo['quantidade'] <= 0) {
-                    $erro = "❌ O livro selecionado não possui estoque.";
+                if (!$livro || $livro['quantidade'] <= 0) {
+                    $erro = "❌ Livro sem estoque.";
                 } else {
-                    $pdo->prepare("UPDATE livros SET quantidade = quantidade + 1 WHERE id = ?")
-                        ->execute([$antigo['livro_id']]);
+
+                    $pdo->prepare("
+                        INSERT INTO emprestimos 
+                        (livro_id, leitor_id, data_emprestimo, data_devolucao, devolvido)
+                        VALUES (?, ?, ?, ?, 0)
+                    ")->execute([
+                        $livro_id,
+                        $leitor_id,
+                        $data_emprestimo,
+                        $data_devolucao
+                    ]);
 
                     $pdo->prepare("UPDATE livros SET quantidade = quantidade - 1 WHERE id = ?")
                         ->execute([$livro_id]);
+
+                    header("Location: emprestimos.php?sucesso=registrado");
+                    exit;
                 }
-            }
-
-            if (!$erro) {
-                $pdo->prepare("
-                    UPDATE emprestimos SET
-                        livro_id = ?,
-                        leitor_id = ?,
-                        data_emprestimo = ?,
-                        data_devolucao = ?
-                    WHERE id = ?
-                ")->execute([
-                    $livro_id,
-                    $leitor_id,
-                    $data_emprestimo,
-                    $data_devolucao,
-                    $editar_id
-                ]);
-
-                header("Location: emprestimos.php?sucesso=editado");
-                exit;
-            }
-
-        } else {
-
-            $check = $pdo->prepare("SELECT quantidade FROM livros WHERE id = ?");
-            $check->execute([$livro_id]);
-            $livro = $check->fetch();
-
-            if (!$livro || $livro['quantidade'] <= 0) {
-                $erro = "❌ Livro sem estoque.";
-            } else {
-
-                $pdo->prepare("
-                    INSERT INTO emprestimos 
-                    (livro_id, leitor_id, data_emprestimo, data_devolucao, devolvido)
-                    VALUES (?, ?, ?, ?, 0)
-                ")->execute([
-                    $livro_id,
-                    $leitor_id,
-                    $data_emprestimo,
-                    $data_devolucao
-                ]);
-
-                $pdo->prepare("UPDATE livros SET quantidade = quantidade - 1 WHERE id = ?")
-                    ->execute([$livro_id]);
-
-                header("Location: emprestimos.php?sucesso=registrado");
-                exit;
             }
         }
     }
@@ -220,7 +237,10 @@ include __DIR__ . '/layout/header.php';
             </div>
 
             <div class="card-body">
-                <form method="POST">
+                <!-- Container para mensagens de erro geradas pelo JS (client-side) -->
+                <div id="clientError" class="alert alert-danger shadow-sm" style="display:none;"></div>
+
+                <form method="POST" id="formEmprestimo">
                     <?php if ($editar_emprestimo): ?>
                         <input type="hidden" name="editar_id" value="<?= $editar_emprestimo['id'] ?>">
                     <?php endif; ?>
@@ -230,8 +250,13 @@ include __DIR__ . '/layout/header.php';
                         <select name="livro_id" class="form-select" required>
                             <option value="">Selecione</option>
                             <?php foreach ($livros as $livro): ?>
+                                <?php
+                                    // permitir que o livro atual do empréstimo seja selecionável mesmo se quantidade == 0
+                                    $isCurrent = $editar_emprestimo && $editar_emprestimo['livro_id'] == $livro['id'];
+                                    $disabledAttr = ($livro['quantidade'] <= 0 && !$isCurrent) ? 'disabled' : '';
+                                ?>
                                 <option value="<?= $livro['id'] ?>"
-                                    <?= $livro['quantidade'] <= 0 ? 'disabled' : '' ?>
+                                    <?= $disabledAttr ?>
                                     <?= ($editar_emprestimo && $editar_emprestimo['livro_id'] == $livro['id']) ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($livro['titulo']) ?>
                                 </option>
@@ -254,19 +279,23 @@ include __DIR__ . '/layout/header.php';
 
                     <div class="mb-3">
                         <label class="form-label">Data do Empréstimo</label>
-                        <input type="date" name="data_emprestimo" class="form-control"
-                               value="<?= $editar_emprestimo['data_emprestimo'] ?? date('Y-m-d') ?>" required>
+                        <input id="data_emprestimo" type="date" name="data_emprestimo" class="form-control"
+                               value="<?= (isset($editar_emprestimo['data_emprestimo']) && $editar_emprestimo['data_emprestimo']) ? date('Y-m-d', strtotime($editar_emprestimo['data_emprestimo'])) : date('Y-m-d') ?>" required>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Data de Devolução</label>
-                        <input type="date" name="data_devolucao" class="form-control"
-                               value="<?= $editar_emprestimo['data_devolucao'] ?? '' ?>" required>
+                        <input id="data_devolucao" type="date" name="data_devolucao" class="form-control"
+                               value="<?= (isset($editar_emprestimo['data_devolucao']) && $editar_emprestimo['data_devolucao']) ? date('Y-m-d', strtotime($editar_emprestimo['data_devolucao'])) : '' ?>" required>
                     </div>
 
                     <button class="btn btn-dark w-100">
                         <?= $editar_emprestimo ? "Salvar Alterações" : "Registrar Empréstimo" ?>
                     </button>
+
+                    <?php if ($editar_emprestimo): ?>
+                        <a href="emprestimos.php" class="btn btn-secondary w-100 mt-2">Cancelar</a>
+                    <?php endif; ?>
                 </form>
             </div>
         </div>
@@ -365,6 +394,57 @@ document.getElementById('buscaEmprestimo').addEventListener('keyup', function ()
         tr.style.display = tr.innerText.toLowerCase().includes(termo) ? '' : 'none';
     });
 });
+</script>
+
+<script>
+// Client-side: impedir data de devolução anterior à data de empréstimo
+(function () {
+    const form = document.getElementById('formEmprestimo');
+    const dataEmp = document.getElementById('data_emprestimo');
+    const dataDev = document.getElementById('data_devolucao');
+    const clientError = document.getElementById('clientError');
+
+    if (!form || !dataEmp || !dataDev) return;
+
+    const today = new Date().toISOString().slice(0,10);
+
+    // se o campo de data do empréstimo estiver vazio (por algum motivo), seta para hoje
+    if (!dataEmp.value) {
+        dataEmp.value = today;
+    }
+
+    // setar min do campo de devolução ao carregar
+    function setMin() {
+        // garantir que dataEmp tenha valor
+        if (!dataEmp.value) dataEmp.value = today;
+        dataDev.min = dataEmp.value;
+        // se a data atual de devolução for anterior, ajustar para a mínima permitida
+        if (dataDev.value && dataDev.value < dataEmp.value) {
+            dataDev.value = dataEmp.value;
+        }
+    }
+
+    setMin();
+
+    dataEmp.addEventListener('change', setMin);
+
+    form.addEventListener('submit', function (e) {
+        clientError.style.display = 'none';
+        clientError.innerText = '';
+
+        if (!dataEmp.value || !dataDev.value) {
+            // o HTML já exige required, então deixamos o browser tratar, mas verificamos por segurança
+            return;
+        }
+
+        if (dataDev.value < dataEmp.value) {
+            e.preventDefault();
+            clientError.innerText = 'A data de devolução não pode ser anterior à data de empréstimo.';
+            clientError.style.display = 'block';
+            window.scrollTo({ top: form.getBoundingClientRect().top + window.scrollY - 20, behavior: 'smooth' });
+        }
+    });
+})();
 </script>
 
 <?php include __DIR__ . '/layout/footer.php'; ?>
