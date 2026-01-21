@@ -56,18 +56,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /* ==============================
-   PAGINAÇÃO (ADICIONADO)
+   PAGINAÇÃO
 ============================== */
 $limite = 10;
-$pagina = isset($_GET['page']) ? (int) $_GET['page'] : 1;
-$pagina = max($pagina, 1);
+$pagina = isset($_GET['page']) ? max((int)$_GET['page'], 1) : 1;
 $offset = ($pagina - 1) * $limite;
 
 $totalLivros = $pdo->query("SELECT COUNT(*) FROM livros")->fetchColumn();
 $totalPaginas = ceil($totalLivros / $limite);
 
 /* ==============================
-   LISTAR LIVROS (COM PAGINAÇÃO)
+   LISTAR LIVROS
 ============================== */
 $stmt = $pdo->prepare("SELECT * FROM livros ORDER BY titulo ASC LIMIT :limite OFFSET :offset");
 $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
@@ -98,11 +97,11 @@ include __DIR__ . '/layout/header.php';
 
 <div class="row g-4">
 
-    <!-- FORMULÁRIO -->
+    <!-- FORMULÁRIO PADRONIZADO -->
     <div class="col-md-4">
         <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white fw-semibold">
-                <?= $edit_livro ? "✏️ Editar Livro" : "➕ Cadastrar Novo Livro" ?>
+            <div class="card-header bg-warning fw-semibold">
+                <?= $edit_livro ? "✏️ Editar Livro" : "➕ Cadastrar Livro" ?>
             </div>
 
             <div class="card-body">
@@ -141,12 +140,12 @@ include __DIR__ . '/layout/header.php';
                                value="<?= $edit_livro['ano'] ?? '' ?>">
                     </div>
 
-                    <button class="btn btn-success w-100 shadow-sm">
-                             <?= $edit_livro ? "Salvar Alterações" : "Cadastrar Livro" ?>
+                    <button class="btn btn-dark w-100">
+                        <?= $edit_livro ? "Salvar Alterações" : "Cadastrar Livro" ?>
                     </button>
 
                     <?php if ($edit_livro): ?>
-                        <a href="livros.php" class="btn btn-outline-secondary w-100 mt-2">
+                        <a href="livros.php" class="btn btn-secondary w-100 mt-2">
                             Cancelar
                         </a>
                     <?php endif; ?>
@@ -159,10 +158,8 @@ include __DIR__ . '/layout/header.php';
     <!-- LISTAGEM -->
     <div class="col-md-8">
         <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white fw-semibold d-flex justify-content-between align-items-center gap-2">
+            <div class="card-header bg-dark text-white fw-semibold d-flex justify-content-between align-items-center">
                 <span>📋 Livros Cadastrados</span>
-
-                <!-- 🔍 BUSCA -->
                 <input type="text"
                        id="buscaLivro"
                        class="form-control form-control-sm w-50"
@@ -177,70 +174,51 @@ include __DIR__ . '/layout/header.php';
                             <th>Autor</th>
                             <th>Ano</th>
                             <th>Estoque</th>
-                            <th class="text-center" style="width:180px">Ações</th>
+                            <th class="text-center">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (count($livros) === 0): ?>
+                        <?php foreach ($livros as $livro): ?>
                             <tr>
-                                <td colspan="5" class="text-center text-muted py-4">
-                                    Nenhum livro cadastrado
+                                <td><?= htmlspecialchars($livro['titulo']) ?></td>
+                                <td><?= htmlspecialchars($livro['autor']) ?></td>
+                                <td><?= $livro['ano'] ?: '-' ?></td>
+                                <td>
+                                    <?= $livro['quantidade'] > 0
+                                        ? '<span class="badge bg-success">'.$livro['quantidade'].' disponível</span>'
+                                        : '<span class="badge bg-danger">Sem estoque</span>' ?>
+                                </td>
+                                <td class="text-center">
+                                    <a href="?edit=<?= $livro['id'] ?>" class="btn btn-sm btn-warning">Editar</a>
+                                    <a href="?delete=<?= $livro['id'] ?>"
+                                       class="btn btn-sm btn-danger"
+                                       onclick="return confirm('Tem certeza que deseja excluir este livro?')">
+                                        Excluir
+                                    </a>
                                 </td>
                             </tr>
-                        <?php else: ?>
-                            <?php foreach ($livros as $livro): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($livro['titulo']) ?></td>
-                                    <td><?= htmlspecialchars($livro['autor']) ?></td>
-                                    <td><?= $livro['ano'] ?: '-' ?></td>
-                                    <td>
-                                        <?php if ($livro['quantidade'] > 0): ?>
-                                            <span class="badge bg-success">
-                                                <?= $livro['quantidade'] ?> disponível
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge bg-danger">
-                                                Sem estoque
-                                            </span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-center">
-                                        <a href="?edit=<?= $livro['id'] ?>" class="btn btn-sm btn-warning">
-                                            ✏️ Editar
-                                        </a>
-                                        <a href="?delete=<?= $livro['id'] ?>"
-                                           class="btn btn-sm btn-danger"
-                                           onclick="return confirm('Tem certeza que deseja excluir este livro?')">
-                                            🗑️ Excluir
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
 
-            <!-- PAGINAÇÃO (ADICIONADO) -->
             <?php if ($totalPaginas > 1): ?>
                 <div class="card-footer">
-                    <nav>
-                        <ul class="pagination justify-content-center mb-0">
-                            <li class="page-item <?= $pagina <= 1 ? 'disabled' : '' ?>">
-                                <a class="page-link" href="?page=<?= $pagina - 1 ?>">Anterior</a>
-                            </li>
+                    <ul class="pagination justify-content-center mb-0">
+                        <li class="page-item <?= $pagina <= 1 ? 'disabled' : '' ?>">
+                            <a class="page-link" href="?page=<?= $pagina - 1 ?>">Anterior</a>
+                        </li>
 
-                            <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
-                                <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
-                                    <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
-                                </li>
-                            <?php endfor; ?>
-
-                            <li class="page-item <?= $pagina >= $totalPaginas ? 'disabled' : '' ?>">
-                                <a class="page-link" href="?page=<?= $pagina + 1 ?>">Próxima</a>
+                        <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
+                            <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
+                                <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
                             </li>
-                        </ul>
-                    </nav>
+                        <?php endfor; ?>
+
+                        <li class="page-item <?= $pagina >= $totalPaginas ? 'disabled' : '' ?>">
+                            <a class="page-link" href="?page=<?= $pagina + 1 ?>">Próxima</a>
+                        </li>
+                    </ul>
                 </div>
             <?php endif; ?>
 
@@ -250,7 +228,6 @@ include __DIR__ . '/layout/header.php';
 </div>
 
 <script>
-// 🔍 BUSCA POR TÍTULO, AUTOR E ANO
 document.getElementById('buscaLivro').addEventListener('keyup', function () {
     const termo = this.value.toLowerCase();
     document.querySelectorAll('#tabelaLivros tbody tr').forEach(tr => {
