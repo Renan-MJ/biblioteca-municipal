@@ -39,9 +39,9 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// =========================
-// CADASTRAR / EDITAR
-// =========================
+
+    //CADASTRAR / EDITAR
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $nome = trim($_POST['nome'] ?? '');
@@ -54,13 +54,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!empty($_POST['id'])) {
-        $pdo->prepare(
-            "UPDATE leitores SET nome=?, cpf=?, telefone=? WHERE id=?"
-        )->execute([$nome, $cpf, $telefone, $_POST['id']]);
+        $id = $_POST['id'];
+        $stmt = $pdo->prepare("UPDATE leitores SET nome=?, cpf=?, telefone=? WHERE id=?");
+        $stmt->execute([$nome, $cpf, $telefone, $id]);
+        $mensagem = "✏️ Leitor atualizado com sucesso.";
+
     } else {
         $pdo->prepare(
             "INSERT INTO leitores (nome, cpf, telefone) VALUES (?, ?, ?)"
         )->execute([$nome, $cpf, $telefone]);
+        $mensagem = "👤 Leitor cadastrado com sucesso.";
     }
 
     header("Location: leitores.php");
@@ -129,7 +132,7 @@ include __DIR__ . '/layout/header.php';
 
     <!-- FORMULÁRIO -->
     <div class="col-md-4">
-        <div class="card shadow-sm border-0">
+        <div class="card shadow-sm">
             <div class="card-header bg-success text-white fw-semibold">
                 <?= $edit_leitor ? "Editar Leitor" : "➕ Cadastrar Leitor" ?>
             </div>
@@ -170,12 +173,12 @@ include __DIR__ . '/layout/header.php';
                                required>
                     </div>
 
-                    <button class="btn btn-success w-100">
+                    <button class="btn btn-dark w-100">
                         <?= $edit_leitor ? "Salvar alterações" : "Cadastrar leitor" ?>
                     </button>
 
                     <?php if ($edit_leitor): ?>
-                        <a href="leitores.php" class="btn btn-outline-secondary w-100 mt-2">
+                        <a href="leitores.php" class="btn btn-secondary w-100 mt-2">
                             Cancelar
                         </a>
                     <?php endif; ?>
@@ -187,9 +190,9 @@ include __DIR__ . '/layout/header.php';
 
     <!-- LISTAGEM -->
     <div class="col-md-8">
-        <div class="card shadow-sm border-0">
+        <div class="card shadow-sm">
             <div class="card-header bg-dark text-white fw-semibold d-flex justify-content-between align-items-center">
-                <span>Leitores cadastrados</span>
+                <span>📋Leitores Cadastrados</span>
                 <input type="text" id="buscaLeitor"
                        class="form-control form-control-sm w-50"
                        placeholder="Buscar por nome, CPF ou telefone">

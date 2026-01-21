@@ -29,9 +29,9 @@ if (isset($_GET['delete'])) {
     }
 }
 
-/* ==============================
-   CADASTRAR OU EDITAR LIVRO
-============================== */
+
+    //CADASTRAR / EDITAR 
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $titulo = $_POST['titulo'] ?? '';
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = $_POST['id'];
         $stmt = $pdo->prepare("UPDATE livros SET titulo=?, autor=?, ano=? WHERE id=?");
         $stmt->execute([$titulo, $autor, $ano, $id]);
-        $mensagem = "✏️ Livro atualizado com sucesso.";
+
     } else {
         if ($titulo && $autor) {
             $quantidade = 1;
@@ -50,9 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 "INSERT INTO livros (titulo, autor, ano, quantidade) VALUES (?, ?, ?, ?)"
             );
             $stmt->execute([$titulo, $autor, $ano, $quantidade]);
-            $mensagem = "📚 Livro cadastrado com sucesso.";
         }
     }
+    header("Location: livros.php");
+    exit;
 }
 
 /* ==============================
@@ -178,6 +179,14 @@ include __DIR__ . '/layout/header.php';
                         </tr>
                     </thead>
                     <tbody>
+
+                        <?php if (count($livros) === 0): ?>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    Nenhum leitor cadastrado
+                                </td>
+                            </tr>
+                        <?php endif; ?>
                         <?php foreach ($livros as $livro): ?>
                             <tr>
                                 <td><?= htmlspecialchars($livro['titulo']) ?></td>
